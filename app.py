@@ -1,27 +1,45 @@
+import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="DOMINUS - Intervista", layout="centered")
+st.set_page_config(
+    page_title="DOMINUS - Cabina di Regia", page_icon="📊", layout="wide"
+)
+st.title("📊 DOMINUS - Gestione e Intervista Interattiva")
+st.markdown("---")
 
-st.title("📊 Intervista DOMINUS")
-st.markdown("Risponda alle seguenti domande per calcolare il Suo Score.")
+file_path = "DOMINUS 2026 DEFINITIVO.xlsx"
 
-# Creiamo una sessione per salvare le risposte
-if 'risposte' not in st.session_state:
-    st.session_state.risposte = {}
 
-# Esempio di Intervista (può aggiungere tutte le domande che vuole)
-tab1, tab2 = st.tabs(["Fase 1: Dati Aziendali", "Fase 2: Analisi Rischi"])
+@st.cache_data
+def load_data(path):
+  xls = pd.ExcelFile(path)
+  sheets_data = {
+      sheet: pd.read_excel(path, sheet_name=sheet) for sheet in xls.sheet_names
+  }
+  return xls.sheet_names, sheets_data
 
-with tab1:
-    st.session_state.risposte['fatturato'] = st.number_input("Inserisca il fatturato previsto:", min_value=0)
-    st.session_state.risposte['dipendenti'] = st.slider("Numero di dipendenti:", 0, 500, 10)
 
-with tab2:
-    st.session_state.risposte['rischio_mercato'] = st.radio("Come valuta il rischio mercato?", ["Basso", "Medio", "Alto"])
+sheet_names, sheets_data = load_data(file_path)
 
-# Bottone di calcolo finale
-if st.button("CALCOLA DOMINUS SCORE"):
-    # Qui inseriremo la logica di calcolo basata sul Suo file Excel
-    st.success("Analisi completata!")
-    st.write("Le Sue risposte:", st.session_state.risposte)
-    st.metric(label="DOMINUS SCORE FINALE", value="78/100")
+selected_sheet = st.sidebar.selectbox("Seleziona Sezione", sheet_names)
+
+st.subheader(f"Area Attiva: {selected_sheet}")
+
+df_corrente = sheets_data[selected_sheet]
+
+
+# Funzione per formattare i numeri con punti e virgole all'italiana
+def format_to_italian(val):
+  if isinstance(val, (int, float)):
+    # Formatta con separatore delle migliaia (punto) e decimali (virgola)
+    return f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+  return val
+
+
+# Applichiamo la formattazione visiva alle colonne numeriche
+df_visivo = df_corrente.copy()
+for col in df_visivo.select_dtypes(include=["number"]).columns:
+  df_visivo[col] = df_visivo[col].apply(format_to_italian)
+
+# Mostriamo la tabella
+st.dataframe(df_visivo, use_container_width=True)
