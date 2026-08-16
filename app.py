@@ -1,52 +1,159 @@
-import pandas as pd
 import streamlit as st
-import openpyxl
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles.numbers import is_date_format
 
-st.set_page_config(page_title="DOMINUS - Editor Totale", layout="wide")
-st.title("📊 DOMINUS - Editor Formato Identico all'Originale")
+FILE_XLSX = "DOMINUS 2026 DEFINITIVO.xlsx"
 
-file_path = "DOMINUS 2026 DEFINITIVO.xlsx"
+st.set_page_config(
+    page_title="DOMINUS 2026",
+    page_icon="📊",
+    layout="wide"
+)
 
-@st.cache_data
-def load_data_exact():
-    wb = openpyxl.load_workbook(file_path, data_only=True)
-    sheets_dict = {}
-    for sheet_name in wb.sheetnames:
-        ws = wb[sheet_name]
-        data = list(ws.values)
-        if data:
-            df = pd.DataFrame(data)
-            # Sostituiamo i valori None con stringhe vuote per una visualizzazione pulita,
-            # ma senza distruggere i tipi nativi (percentuali e numeri originali dell'Excel)
-            df = df.fillna("")
-        else:
-            df = pd.DataFrame()
-        sheets_dict[sheet_name] = df
-    return sheets_dict
+st.title("📊 DOMINUS 2026 - Editor Online")
 
-if "master_data" not in st.session_state:
-    st.session_state["master_data"] = load_data_exact()
 
-sheet_list = list(st.session_state["master_data"].keys())
-selected_sheet = st.sidebar.selectbox("Seleziona Sezione", sheet_list)
+def format_excel_value(cell):
 
-st.subheader(f"Sezione: {selected_sheet}")
+    value = cell.value
 
-# Configurazione colonna per colonna: impedisce che i testi "SI/NO" diventino checkbox, 
-# lasciando intatte le percentuali e i numeri originali.
-df_corrente = st.session_state["master_data"][selected_sheet]
-column_config = {col: st.column_config.TextColumn(str(col)) for col in df_corrente.columns}
+    if value is None:
+        return ""
 
-# Editor Blindato
+    fmt = str(cell.number_format)
+
+    try:
+
+        # Percentuali
+        if "%" in fmt and isinstance(value, (int, float)):
+            perc = value * 100
+
+            if ".00" in fmt or "0.00%" in fmt:
+                return f"{perc:.2f}%".replace(".", ",")
+
+            return f"{perc:.0f}%"
+
+        # Date
+        if is_date_format(fmt):
+            return value.strftime("%d/%m/%Y")
+
+        # Numeri
+        if isinstance(value, (int, float)):
+
+            if abs(value) >= 1000:
+
+                txt = f"{value:,.2f}"
+
+                txt = (
+                    txt.replace(",", "§")
+                       .replace(".", ",")
+                       .replace("§", ".")
+                )
+
+                if txt.endswith(",00"):
+                    txt = txt[:-3]
+
+                return txt
+
+            else:
+
+                txt = str(value)
+
+                if "." in txt:
+                    txt = txt.replace(".", ",")
+
+                return txt
+
+        return str(value)
+
+    except:
+        return str(value)
+
+
+@st.cache_resource
+def load_workbook_cached():
+    return load_workbook(
+        FILE_XLSX,
+        data_only=False
+    )
+
+
+wb = load_workbook_cached()
+
+sheet_name = st.sidebar.selectbox(
+    "Seleziona Foglio",
+    wb.sheetnames
+)
+
+ws = wb[sheet_name]
+
+rows = []
+
+max_col = ws.max_column
+
+for row in ws.iter_rows():
+
+    values = []
+
+    for cell in row:
+        values.append(format_excel_value(cell))
+
+    while len(values) < max_col:
+        values.append("")
+
+    rows.append(values)
+
+if len(rows) == 0:
+    df = pd.DataFrame()
+else:
+    df = pd.DataFrame(rows)
+
+column_config = {
+    col: st.column_config.TextColumn(
+        str(col),
+        width="medium"
+    )
+    for col in df.columns
+}
+
+st.subheader(sheet_name)
+
 edited_df = st.data_editor(
-    df_corrente,
+    df,
     use_container_width=True,
     num_rows="dynamic",
     column_config=column_config,
-    key=f"editor_blindato_{selected_sheet}"
+    key=f"editor_{sheet_name}"
 )
 
-st.session_state["master_data"][selected_sheet] = edited_df
+if st.button("💾 Salva Workbook", type="primary"):
 
-if st.button("💾 Salva"):
-    st.success("Modifiche salvate con successo!")
+    wb_save = load_workbook(
+        FILE_XLSX,
+        data_only=False
+    )
+
+    ws_save = wb_save[sheet_name]
+
+    for r in range(len(edited_df)):
+
+        for c in range(len(edited_df.columns)):
+
+            value = edited_df.iat[r, c]
+
+            if value == "":
+                value = None
+
+            ws_save.cell(
+                row=r + 1,
+                column=c + 1
+            ).value = value
+
+    wb_save.save(FILE_XLSX)
+
+    st.success("✅ Modifiche salvate correttamente.")
+
+    st.cache_resource.clear()
+
+    st.rerun()
