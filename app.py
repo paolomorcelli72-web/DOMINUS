@@ -57,8 +57,33 @@ EDITABILI = [
 
 df = st.session_state.sheets[sheet_name].copy()
 
+def formatta_valore(v):
+
+    try:
+
+        if isinstance(v, float):
+
+            # percentuali
+            if 0 <= v <= 1:
+                return f"{v * 100:.2f}%".replace(".", ",")
+
+            # numeri con migliaia
+            if abs(v) >= 1000:
+                return (
+                    f"{v:,.0f}"
+                    .replace(",", "§")
+                    .replace(".", ",")
+                    .replace("§", ".")
+                )
+
+        return str(v)
+
+    except:
+        return str(v)
+
+
 for col in df.columns:
-    df[col] = df[col].astype(str)
+    df[col] = df[col].apply(formatta_valore)
 
 if sheet_name in EDITABILI:
 
