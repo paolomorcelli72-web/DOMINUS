@@ -119,17 +119,25 @@ else:
 
 if sheet_name in EDITABILI:
 
-edited_df = st.data_editor(
-    df,
-    use_container_width=True,
-    num_rows="fixed",
-    hide_index=True,
-    column_config={
-        col: st.column_config.TextColumn(str(col))
-        for col in df.columns
-    },
-    key=f"editor_{sheet_name}"
-)
+    edited_df = st.data_editor(
+        df,
+        use_container_width=True,
+        num_rows="fixed",
+        hide_index=True,
+        column_config={
+            col: st.column_config.TextColumn(str(col))
+            for col in df.columns
+        },
+        key=f"editor_{sheet_name}"
+    )
+
+else:
+
+    edited_df = df
+
+    st.dataframe(
+        df,
+        use_container_width=True
 
 else:
 
