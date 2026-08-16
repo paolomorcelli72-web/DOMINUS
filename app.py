@@ -29,24 +29,25 @@ st.subheader(f"Area Attiva: {selected_sheet}")
 df_to_show = sheets_data[selected_sheet].copy()
 
 
-# Funzione di formattazione intelligente per numeri e percentuali
-def format_cell(val, col_name="", sheet_name=""):
+# Funzione sicura: formatta SOLO i numeri reali, lascia stare i testi
+def format_numbers_only(val, col_name="", sheet_name=""):
   if pd.isnull(val) or val == "None":
     return val
 
-  # Riconosce se è una percentuale in base al nome della colonna o del foglio
-  is_percentage = False
-  if any(
-      p in str(col_name).upper() for p in ["%", "ROS", "MARGIN", "TASSO", "PESO"]
-  ):
-    is_percentage = True
-  if sheet_name == "INPUT" and col_name == "Valore":
-    is_percentage = True
-
+  # Controlliamo se è un numero (int o float) o se può essere convertito in modo sicuro
   try:
     num_val = float(val)
+
+    # Identifica se la colonna deve essere in percentuale
+    is_percentage = False
+    if any(
+        p in str(col_name).upper() for p in ["%", "ROS", "MARGIN", "TASSO", "PESO"]
+    ):
+      is_percentage = True
+    if sheet_name == "INPUT" and col_name == "Valore":
+      is_percentage = True
+
     if is_percentage:
-      # Se il valore è già in formato decimale (es. 0.0633), lo convertiamo in %
       val_pct = num_val * 100 if num_val < 1 else num_val
       return (
           f"{val_pct:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -59,14 +60,16 @@ def format_cell(val, col_name="", sheet_name=""):
           .replace(".", ",")
           .replace("X", ".")
       )
-  except ValueError:
+
+  except (ValueError, TypeError):
+    # Se il valore è un testo (stringa), lo restituisce esattamente com'è senza toccarlo
     return val
 
 
-# Applichiamo la formattazione colonna per colonna
+# Applichiamo la formattazione solo sulle colonne o celle che contengono dati numerici
 for col in df_to_show.columns:
   df_to_show[col] = df_to_show[col].apply(
-      lambda x: format_cell(x, col_name=col, sheet_name=selected_sheet)
+      lambda x: format_numbers_only(x, col_name=col, sheet_name=selected_sheet)
   )
 
 st.dataframe(df_to_show, use_container_width=True)
