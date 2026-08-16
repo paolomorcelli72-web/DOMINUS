@@ -154,30 +154,11 @@ try:
 
     c1, c2, c3, c4, c5 = st.columns(5)
 
-    c1.metric(
-        "Assetto",
-        f"{assetto * 100:.2f}%"
-    )
-
-    c2.metric(
-        "Patrimonio",
-        f"{patrimonio * 100:.2f}%"
-    )
-
-    c3.metric(
-        "Valore",
-        f"{valore * 100:.2f}%"
-    )
-
-    c4.metric(
-        "Custodia",
-        f"{custodia * 100:.2f}%"
-    )
-
-    c5.metric(
-        "Score",
-        f"{dominus_score:.2f}"
-    )
+    c1.metric("Assetto", f"{assetto * 100:.2f}%")
+    c2.metric("Patrimonio", f"{patrimonio * 100:.2f}%")
+    c3.metric("Valore", f"{valore * 100:.2f}%")
+    c4.metric("Custodia", f"{custodia * 100:.2f}%")
+    c5.metric("Score", f"{dominus_score:.2f}")
 
     if dominus_score < 35:
         rating = "AAA"
@@ -219,30 +200,27 @@ if st.button("💾 Salva Workbook"):
 
             ws = wb_save[foglio]
 
-            max_r = min(
-                len(dataframe),
-                ws.max_row
-            )
-
-            max_c = min(
-                len(dataframe.columns),
-                ws.max_column
-            )
+            max_r = min(len(dataframe), ws.max_row)
+            max_c = min(len(dataframe.columns), ws.max_column)
 
             for r in range(max_r):
 
                 for c in range(max_c):
 
-                    valore = dataframe.iat[r, c]
+                    try:
 
-                    if pd.isna(valore):
-                        valore = None
+                        valore = dataframe.iat[r, c]
 
-                    ws.cell(
-                        row=r + 1,
-                        column=c + 1,
-                        value=valore
-                    )
+                        if pd.isna(valore):
+                            valore = None
+
+                        ws.cell(
+                            row=r + 1,
+                            column=c + 1
+                        ).value = valore
+
+                    except:
+                        pass
 
         wb_save.save(FILE_XLSX)
 
