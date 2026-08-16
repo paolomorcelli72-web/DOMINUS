@@ -138,18 +138,9 @@ else:
     st.dataframe(
         df,
         use_container_width=True
-
-else:
-
-    edited_df = df
-
-    st.dataframe(
-        df,
-        use_container_width=True
     )
 
 st.session_state.sheets[sheet_name] = edited_df
-
 
 def calcola_ambito(df):
 
