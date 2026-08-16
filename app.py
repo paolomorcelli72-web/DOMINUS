@@ -200,8 +200,49 @@ if st.button("💾 Salva Workbook"):
 
             ws = wb_save[foglio]
 
-            max_r = min(len(dataframe), ws.max_row)
-            max_c = min(len(dataframe.columns), ws.max_column)
+            max_r = min(
+                len(dataframe),
+                ws.max_row
+            )
+
+            max_c = min(
+                len(dataframe.columns),
+                ws.max_column
+            )
+
+            for r in range(max_r):
+
+                for c in range(max_c):
+
+                    try:
+
+                        cella = ws.cell(
+                            row=r + 1,
+                            column=c + 1
+                        )
+
+                        valore = dataframe.iat[r, c]
+
+                        if pd.isna(valore):
+                            valore = None
+
+                        try:
+                            cella.value = valore
+                        except:
+                            pass
+
+                    except:
+                        pass
+
+        wb_save.save(FILE_XLSX)
+
+        st.success("✅ Workbook salvato")
+
+    except Exception as e:
+
+        st.error(
+            f"Errore salvataggio: {e}"
+        )
 
             for r in range(max_r):
 
