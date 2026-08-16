@@ -2,78 +2,69 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="DOMINUS - Gestione Totale Sezioni", page_icon="📊", layout="wide"
+    page_title="DOMINUS - Editor Universale Totale",
+    page_icon="📊",
+    layout="wide",
 )
-st.title("📊 DOMINUS - Modifica e Gestione di Tutte le Tabelle")
+st.title("📊 DOMINUS - Modifica Totale di Ogni Campo e Cella")
 st.markdown("---")
 
 file_path = "DOMINUS 2026 DEFINITIVO.xlsx"
 
 
+# Caricamento completo di tutti i fogli del file Excel originale
 @st.cache_data
-def load_all_data(path):
+def load_all_sheets(path):
   xls = pd.ExcelFile(path)
-  sheets = {}
-  for s in xls.sheet_names:
-    sheets[s] = pd.read_excel(path, sheet_name=s, header=None)
-  return sheets
+  sheets_dict = {}
+  for sheet in xls.sheet_names:
+    df = pd.read_excel(path, sheet_name=sheet, header=None)
+    # Convertiamo tutte le colonne in stringhe per evitare conflitti di tipo durante l'editing
+    df = df.astype(str)
+    df = df.replace("nan", "")
+    sheets_dict[sheet] = df
+  return sheets_dict
 
 
-if "master_data" not in st.session_state:
-  st.session_state["master_data"] = load_all_data(file_path)
+if "master_sheets" not in st.session_state:
+  st.session_state["master_sheets"] = load_all_sheets(file_path)
 
-# Menu di selezione di tutti i fogli del file
-sheet_list = list(st.session_state["master_data"].keys())
-selected_sheet = st.sidebar.selectbox(
-    "Seleziona Sezione da Modificare", sheet_list
-)
+# Menu laterale per scegliere quale foglio/tabella modificare
+sheet_list = list(st.session_state["master_sheets"].keys())
+selected_sheet = st.sidebar.selectbox("Seleziona Sezione da Modificare", sheet_list)
 
 st.subheader(f"Sezione Attiva: {selected_sheet}")
-df_corrente = st.session_state["master_data"][selected_sheet]
-
 st.markdown(
-    "💡 *Modifichi i valori direttamente nei campi sottostanti. Ogni casella"
-    " corrisponde a una cella della tabella originale.*"
+    "💡 *Ogni cella della tabella sottostante è interamente editabile. Può"
+    " cliccare su qualsiasi casella, cancellare e scrivere il valore che"
+    " desidera (es. da MILANO a BERGAMO).* "
 )
 
-# Creazione dinamica di un modulo di input per ogni riga e cella della tabella attiva
-with st.form(f"form_univoco_{selected_sheet}"):
-  righe, colonne = df_corrente.shape
-  nuovi_dati = []
+# Estraiamo il dataframe corrente dalla memoria di sessione
+df_corrente = st.session_state["master_sheets"][selected_sheet]
 
-  # Mostriamo le righe in modo ordinato con campi di testo modificabili
-  for r in range(righe):
-    st.markdown(f"**Riga {r+1}**")
-    cols = st.columns(min(colonne, 4))  # Suddivide in colonne per leggibilità
-    riga_valori = []
-    for c in range(colonne):
-      valore_cella = df_corrente.iloc[r, c]
-      valore_str = "" if pd.isnull(valore_cella) else str(valore_cella)
+# Editor interattivo totale per ogni cella della griglia
+df_modificato = st.data_editor(
+    df_corrente,
+    use_container_width=True,
+    num_rows="dynamic",
+    key=f"grid_totale_{selected_sheet}",
+)
 
-      with cols[c % len(cols)]:
-        # Campo di input testuale per ogni singola cella
-        val_mod = st.text_input(
-            f"R{r+1}C{c+1}", value=valore_str, key=f"cell_{selected_sheet}_{r}_{c}"
-        )
-        riga_valori.append(val_mod)
-    nuovi_dati.append(riga_valori)
-    st.markdown("---")
+# Salvataggio istantaneo delle modifiche nella sessione
+st.session_state["master_sheets"][selected_sheet] = df_modificato
 
-  salva_tutto = st.form_submit_button(
-      f"💾 Salva Modifiche per {selected_sheet}"
-  )
+st.markdown("---")
+col1, col2 = st.columns(2)
 
-  if salva_tutto:
-    # Aggiorniamo il dataframe in memoria con i nuovi valori inseriti
-    nuovo_df = pd.DataFrame(nuovi_dati)
-    st.session_state["master_data"][selected_sheet] = nuovo_df
+with col1:
+  if st.button("💾 Conferma e Salva Modifiche Sezione"):
     st.success(
-        f"✅ Tutti i dati della sezione '{selected_sheet}' sono stati aggiornati"
-        " con successo!"
+        f"Tutte le modifiche apportate alla sezione '{selected_sheet}' sono"
+        " state salvate con successo!"
     )
 
-# Sezione di riscontro visivo della tabella aggiornata
-st.subheader("Visualizzazione Tabella Attuale")
-st.dataframe(
-    st.session_state["master_data"][selected_sheet], use_container_width=True
-)
+with col2:
+  if st.button("🔄 Ripristina Dati Originali"):
+    st.session_state["master_sheets"] = load_all_sheets(file_path)
+    st.rerun()
