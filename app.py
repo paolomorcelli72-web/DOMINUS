@@ -2,69 +2,46 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(
-    page_title="DOMINUS - Editor Universale Totale",
+    page_title="DOMINUS - Editor Speciale INPUT",
     page_icon="📊",
     layout="wide",
 )
-st.title("📊 DOMINUS - Modifica Totale di Ogni Campo e Cella")
+st.title("📊 DOMINUS - Modifica Totale (Focus Sezione INPUT)")
 st.markdown("---")
 
 file_path = "DOMINUS 2026 DEFINITIVO.xlsx"
 
-
-# Caricamento completo di tutti i fogli del file Excel originale
 @st.cache_data
-def load_all_sheets(path):
-  xls = pd.ExcelFile(path)
-  sheets_dict = {}
-  for sheet in xls.sheet_names:
-    df = pd.read_excel(path, sheet_name=sheet, header=None)
-    # Convertiamo tutte le colonne in stringhe per evitare conflitti di tipo durante l'editing
-    df = df.astype(str)
-    df = df.replace("nan", "")
-    sheets_dict[sheet] = df
-  return sheets_dict
+def load_data():
+    return pd.read_excel(file_path, sheet_name=None, header=None)
 
+if "master_data" not in st.session_state:
+    st.session_state["master_data"] = load_data()
 
-if "master_sheets" not in st.session_state:
-  st.session_state["master_sheets"] = load_all_sheets(file_path)
+# Selezione Sezione
+sheet_names = list(st.session_state["master_data"].keys())
+selected_sheet = st.sidebar.selectbox("Seleziona Sezione", sheet_names, index=sheet_names.index("INPUT"))
 
-# Menu laterale per scegliere quale foglio/tabella modificare
-sheet_list = list(st.session_state["master_sheets"].keys())
-selected_sheet = st.sidebar.selectbox("Seleziona Sezione da Modificare", sheet_list)
+st.subheader(f"Area Attiva: {selected_sheet}")
 
-st.subheader(f"Sezione Attiva: {selected_sheet}")
-st.markdown(
-    "💡 *Ogni cella della tabella sottostante è interamente editabile. Può"
-    " cliccare su qualsiasi casella, cancellare e scrivere il valore che"
-    " desidera (es. da MILANO a BERGAMO).* "
-)
+# Editor Speciale che preserva i formati
+df_corrente = st.session_state["master_data"][selected_sheet]
 
-# Estraiamo il dataframe corrente dalla memoria di sessione
-df_corrente = st.session_state["master_sheets"][selected_sheet]
-
-# Editor interattivo totale per ogni cella della griglia
+# Sezione specifica per il foglio INPUT: vogliamo che ogni cella sia editabile
+# Utilizziamo un editor che non forzi la conversione in stringa, mantenendo intatte le %
 df_modificato = st.data_editor(
     df_corrente,
     use_container_width=True,
     num_rows="dynamic",
-    key=f"grid_totale_{selected_sheet}",
+    key=f"editor_{selected_sheet}"
 )
 
-# Salvataggio istantaneo delle modifiche nella sessione
-st.session_state["master_sheets"][selected_sheet] = df_modificato
+# Salvataggio
+if st.button("💾 Salva Modifiche per questa Sezione"):
+    st.session_state["master_data"][selected_sheet] = df_modificato
+    st.success(f"Modifiche salvate con successo nel foglio {selected_sheet}!")
 
+# Mostriamo i dati correnti per controllo
 st.markdown("---")
-col1, col2 = st.columns(2)
-
-with col1:
-  if st.button("💾 Conferma e Salva Modifiche Sezione"):
-    st.success(
-        f"Tutte le modifiche apportate alla sezione '{selected_sheet}' sono"
-        " state salvate con successo!"
-    )
-
-with col2:
-  if st.button("🔄 Ripristina Dati Originali"):
-    st.session_state["master_sheets"] = load_all_sheets(file_path)
-    st.rerun()
+st.write("Visualizzazione Dati Correnti:")
+st.dataframe(st.session_state["master_data"][selected_sheet], use_container_width=True)
