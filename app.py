@@ -81,9 +81,40 @@ def formatta_valore(v):
     except:
         return str(v)
 
+if sheet_name == "QUADRO DI CONTROLLO":
 
-for col in df.columns:
-    df[col] = df[col].apply(formatta_valore)
+    def formatta_controllo(v):
+
+        try:
+
+            numero = float(str(v).replace(",", "."))
+
+            if numero.is_integer():
+
+                return (
+                    f"{int(numero):,}"
+                    .replace(",", ".")
+                )
+
+            return (
+                f"{numero:,.2f}"
+                .replace(",", "§")
+                .replace(".", ",")
+                .replace("§", ".")
+            )
+
+        except:
+            return str(v)
+
+    for col in df.columns:
+        df[col] = df[col].apply(formatta_controllo)
+
+else:
+
+    for col in df.columns:
+        df[col] = df[col].astype(str)
+``
+
 
 if sheet_name in EDITABILI:
 
