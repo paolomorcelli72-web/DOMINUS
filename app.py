@@ -2,60 +2,56 @@ import streamlit as st
 import pandas as pd
 from openpyxl import load_workbook
 
-FILE = "DOMINUS 2026 DEFINITIVO.xlsx"
+FILE_XLSX = "DOMINUS 2026 DEFINITIVO.xlsx"
 
 st.set_page_config(
-    page_title="DOMINUS 2026",
+    page_title="DOMINUS WEB",
     layout="wide"
 )
 
-st.title("📊 DOMINUS WEB ENGINE")
+st.title("📊 DOMINUS WEB")
 
 # --------------------------------------------------
-# LOAD EXCEL
+# CARICA EXCEL UNA SOLA VOLTA
 # --------------------------------------------------
 @st.cache_resource
 def load_excel():
-    return load_workbook(FILE)
+    return load_workbook(FILE_XLSX, data_only=False)
 
 wb = load_excel()
 
 # --------------------------------------------------
-# SHEETS
+# CREA DATAFRAME IN MEMORIA
 # --------------------------------------------------
-sheet_names = wb.sheetnames
+if "sheets" not in st.session_state:
 
-selected_sheet = st.sidebar.selectbox(
-    "Seleziona Foglio",
-    sheet_names
+    st.session_state.sheets = {}
+
+    for sheet in wb.sheetnames:
+
+        ws = wb[sheet]
+
+        rows = []
+
+        for row in ws.iter_rows(values_only=True):
+            rows.append(list(row))
+
+        st.session_state.sheets[sheet] = pd.DataFrame(rows)
+
+# --------------------------------------------------
+# MENU
+# --------------------------------------------------
+sheet_name = st.sidebar.selectbox(
+    "Foglio",
+    wb.sheetnames
 )
 
-ws = wb[selected_sheet]
+df = st.session_state.sheets[sheet_name]
 
-# --------------------------------------------------
-# EXCEL --> DATAFRAME
-# --------------------------------------------------
-data = []
+# tutto testo
+for col in df.columns:
+    df[col] = df[col].astype(str)
 
-for row in ws.iter_rows(values_only=True):
-    r = []
-
-    for cell in row:
-        if cell is None:
-            r.append("")
-        else:
-            r.append(str(cell))
-
-    data.append(r)
-
-if len(data) == 0:
-    df = pd.DataFrame()
-else:
-    df = pd.DataFrame(data)
-
-# --------------------------------------------------
-# FORCE TEXT (NO CHECKBOX)
-# --------------------------------------------------
 column_config = {
     col: st.column_config.TextColumn(
         str(col)
@@ -67,41 +63,17 @@ edited_df = st.data_editor(
     df,
     use_container_width=True,
     num_rows="dynamic",
-    column_config=column_config
+    column_config=column_config,
+    key=f"editor_{sheet_name}"
 )
 
-# --------------------------------------------------
-# SAVE
-# --------------------------------------------------
-if st.button("💾 Salva"):
-
-    wb_save = load_workbook(FILE)
-
-    ws_save = wb_save[selected_sheet]
-
-    for r in range(len(edited_df)):
-        for c in range(len(edited_df.columns)):
-
-            value = edited_df.iat[r, c]
-
-            if value == "":
-                value = None
-
-            ws_save.cell(
-                row=r + 1,
-                column=c + 1
-            ).value = value
-
-    wb_save.save(FILE)
-
-    st.success("Salvataggio completato")
+# aggiorna memoria
+st.session_state.sheets[sheet_name] = edited_df
 
 # --------------------------------------------------
-# DOMINUS SCORE
+# MOTORE DOMINUS
 # --------------------------------------------------
-def calcola_ambito(nome_foglio):
-
-    ws = wb[nome_foglio]
+def calcola_ambito(df):
 
     cg_tot = 0
     cg_no = 0
@@ -109,12 +81,17 @@ def calcola_ambito(nome_foglio):
     si = 0
     no = 0
 
-    for row in ws.iter_rows(min_row=2):
-
-        risposta = str(row[2].value).strip().upper()
+    for i in range(1, len(df)):
 
         try:
-            cg = float(row[3].value)
+            risposta = str(df.iloc[i, 2]).strip().upper()
+        except:
+            continue
+
+        try:
+            cg = float(
+                str(df.iloc[i, 3]).replace(",", ".")
+            )
         except:
             cg = 0
 
@@ -132,31 +109,36 @@ def calcola_ambito(nome_foglio):
     if cg_tot > 0:
         vulnerabilita = cg_no / cg_tot
 
-    totale = si + no
-
-    score = 0
-
-    if totale > 0:
-        score = si / totale
-
     return {
         "si": si,
         "no": no,
-        "vulnerabilita": vulnerabilita,
-        "score": score
+        "cg_tot": cg_tot,
+        "cg_no": cg_no,
+        "vulnerabilita": vulnerabilita
     }
 
 # --------------------------------------------------
-# SCORE LIVE
+# CALCOLO LIVE
 # --------------------------------------------------
 try:
 
-    assetto = calcola_ambito("ASSETTO")
-    patrimonio = calcola_ambito("PATRIMONIO")
-    valore = calcola_ambito("VALORE")
-    custodia = calcola_ambito("CUSTODIA")
+    assetto = calcola_ambito(
+        st.session_state.sheets["ASSETTO"]
+    )
 
-    score_finale = (
+    patrimonio = calcola_ambito(
+        st.session_state.sheets["PATRIMONIO"]
+    )
+
+    valore = calcola_ambito(
+        st.session_state.sheets["VALORE"]
+    )
+
+    custodia = calcola_ambito(
+        st.session_state.sheets["CUSTODIA"]
+    )
+
+    dominus_score = (
         assetto["vulnerabilita"] * 50 +
         patrimonio["vulnerabilita"] * 10 +
         valore["vulnerabilita"] * 30 +
@@ -190,26 +172,54 @@ try:
     )
 
     c5.metric(
-        "Dominus Score",
-        f"{score_finale:.2f}"
+        "Score",
+        f"{dominus_score:.2f}"
     )
 
-    if score_finale < 35:
+    if dominus_score < 35:
         rating = "AAA"
-    elif score_finale < 43:
+    elif dominus_score < 43:
         rating = "AA"
-    elif score_finale < 50:
+    elif dominus_score < 50:
         rating = "A"
-    elif score_finale < 58:
+    elif dominus_score < 58:
         rating = "BBB"
-    elif score_finale < 65:
+    elif dominus_score < 65:
         rating = "BB"
-    elif score_finale < 80:
+    elif dominus_score < 80:
         rating = "B"
     else:
         rating = "D"
 
     st.success(f"🏆 Rating: {rating}")
 
-except Exception:
-    pass
+except Exception as e:
+    st.error(f"Errore motore DOMINUS: {e}")
+
+# --------------------------------------------------
+# SALVATAGGIO
+# --------------------------------------------------
+if st.button("💾 Salva Workbook"):
+
+    wb_save = load_workbook(FILE_XLSX)
+
+    for foglio, dataframe in st.session_state.sheets.items():
+
+        ws = wb_save[foglio]
+
+        for r in range(len(dataframe)):
+            for c in range(len(dataframe.columns)):
+
+                valore = dataframe.iat[r, c]
+
+                if valore == "nan":
+                    valore = None
+
+                ws.cell(
+                    row=r + 1,
+                    column=c + 1
+                ).value = valore
+
+    wb_save.save(FILE_XLSX)
+
+    st.success("✅ File salvato")
