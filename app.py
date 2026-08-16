@@ -87,21 +87,24 @@ if sheet_name == "QUADRO DI CONTROLLO":
 
         try:
 
-            numero = float(str(v).replace(",", "."))
+            txt = str(v).strip()
 
-            if numero.is_integer():
+            if txt == "":
+                return ""
+
+            numero = float(txt)
+
+            if abs(numero) >= 1000:
 
                 return (
-                    f"{int(numero):,}"
+                    f"{int(round(numero)):,}"
                     .replace(",", ".")
                 )
 
-            return (
-                f"{numero:,.2f}"
-                .replace(",", "§")
-                .replace(".", ",")
-                .replace("§", ".")
-            )
+            if numero.is_integer():
+                return str(int(numero))
+
+            return str(numero).replace(".", ",")
 
         except:
             return str(v)
@@ -113,7 +116,6 @@ else:
 
     for col in df.columns:
         df[col] = df[col].astype(str)
-
 
 if sheet_name in EDITABILI:
 
