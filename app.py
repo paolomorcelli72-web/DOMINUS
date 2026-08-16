@@ -29,16 +29,27 @@ st.subheader(f"Area Attiva: {selected_sheet}")
 df_to_show = sheets_data[selected_sheet].copy()
 
 
-# Funzione sicura: formatta SOLO i numeri reali, lascia stare i testi
-def format_numbers_only(val, col_name="", sheet_name=""):
+# Funzione di formattazione sicura che protegge i codici (Partita IVA, ATECO, ecc.)
+def format_numbers_safely(val, col_name="", sheet_name="", row_label=""):
   if pd.isnull(val) or val == "None":
     return val
 
-  # Controlliamo se è un numero (int o float) o se può essere convertito in modo sicuro
+  # Se siamo nella sezione Anagrafica e la riga riguarda Partita IVA o Codice ATECO, non tocchiamo nulla
+  str_label = str(row_label).upper()
+  if "ANAGRAFICA" in sheet_name.upper() and (
+      "IVA" in str_label
+      or "ATECO" in str_label
+      or "CODICE" in str_label
+      or "P.IVA" in str_label
+  ):
+    return str(val).replace(
+        ".0", ""
+    )  # Rimuove eventuali .0 superflui se letti come numeri
+
   try:
     num_val = float(val)
 
-    # Identifica se la colonna deve essere in percentuale
+    # Controlliamo se è una percentuale
     is_percentage = False
     if any(
         p in str(col_name).upper() for p in ["%", "ROS", "MARGIN", "TASSO", "PESO"]
@@ -54,6 +65,11 @@ def format_numbers_only(val, col_name="", sheet_name=""):
           + "%"
       )
     else:
+      # Evitiamo di formattare come numeri con decimali i codici lunghi o interi che non lo richiedono
+      if num_val > 1000000000 and not any(
+          k in str(col_name).upper() for k in ["VALORE", "IMPORTO", "FATTURATO"]
+      ):
+        return str(val).replace(".0", "")
       return (
           f"{num_val:,.2f}"
           .replace(",", "X")
@@ -62,14 +78,22 @@ def format_numbers_only(val, col_name="", sheet_name=""):
       )
 
   except (ValueError, TypeError):
-    # Se il valore è un testo (stringa), lo restituisce esattamente com'è senza toccarlo
     return val
 
 
-# Applichiamo la formattazione solo sulle colonne o celle che contengono dati numerici
+# Troviamo la colonna delle etichette (di solito la prima colonna a sinistra)
+label_col = df_to_show.columns[0] if len(df_to_show.columns) > 0 else None
+
+# Applichiamo la formattazione cella per cella escludendo i dati anagrafici sensibili
 for col in df_to_show.columns:
-  df_to_show[col] = df_to_show[col].apply(
-      lambda x: format_numbers_only(x, col_name=col, sheet_name=selected_sheet)
-  )
+  df_to_show[col] = [
+      format_numbers_safely(
+          df_to_show.loc[i, col],
+          col_name=col,
+          sheet_name=selected_sheet,
+          row_label=df_to_show.loc[i, label_col] if label_col else "",
+      )
+      for i in df_to_show.index
+  ]
 
 st.dataframe(df_to_show, use_container_width=True)
