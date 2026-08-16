@@ -205,29 +205,27 @@ if st.button("💾 Salva Workbook"):
 
             for r in range(max_r):
 
-                for c in range(max_c):
+    for c in range(max_c):
 
-                    try:
+        try:
 
-                        valore = dataframe.iat[r, c]
+            cella = ws.cell(
+                row=r + 1,
+                column=c + 1
+            )
 
-                        if pd.isna(valore):
-                            valore = None
+            if type(cella).__name__ == "MergedCell":
+                continue
 
-                        ws.cell(
-                            row=r + 1,
-                            column=c + 1
-                        ).value = valore
+            valore = dataframe.iat[r, c]
 
-                    except:
-                        pass
+            if pd.isna(valore):
+                valore = None
 
-        wb_save.save(FILE_XLSX)
+            try:
+                cella.value = valore
+            except:
+                pass
 
-        st.success("✅ Workbook salvato")
-
-    except Exception as e:
-
-        st.error(
-            f"Errore salvataggio: {e}"
-        )
+        except:
+            pass
