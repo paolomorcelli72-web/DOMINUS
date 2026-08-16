@@ -113,7 +113,6 @@ else:
 
     for col in df.columns:
         df[col] = df[col].astype(str)
-``
 
 
 if sheet_name in EDITABILI:
