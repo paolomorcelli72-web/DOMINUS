@@ -1,143 +1,85 @@
 import streamlit as st
 import pandas as pd
 from openpyxl import load_workbook
-from openpyxl.styles.numbers import is_date_format
 
-FILE_XLSX = "DOMINUS 2026 DEFINITIVO.xlsx"
+FILE = "DOMINUS 2026 DEFINITIVO.xlsx"
 
 st.set_page_config(
     page_title="DOMINUS 2026",
-    page_icon="📊",
     layout="wide"
 )
 
-st.title("📊 DOMINUS 2026 - Editor Online")
+st.title("📊 DOMINUS WEB ENGINE")
 
-
-def format_excel_value(cell):
-
-    value = cell.value
-
-    if value is None:
-        return ""
-
-    fmt = str(cell.number_format)
-
-    try:
-
-        # Percentuali
-        if "%" in fmt and isinstance(value, (int, float)):
-            perc = value * 100
-
-            if ".00" in fmt or "0.00%" in fmt:
-                return f"{perc:.2f}%".replace(".", ",")
-
-            return f"{perc:.0f}%"
-
-        # Date
-        if is_date_format(fmt):
-            return value.strftime("%d/%m/%Y")
-
-        # Numeri
-        if isinstance(value, (int, float)):
-
-            if abs(value) >= 1000:
-
-                txt = f"{value:,.2f}"
-
-                txt = (
-                    txt.replace(",", "§")
-                       .replace(".", ",")
-                       .replace("§", ".")
-                )
-
-                if txt.endswith(",00"):
-                    txt = txt[:-3]
-
-                return txt
-
-            else:
-
-                txt = str(value)
-
-                if "." in txt:
-                    txt = txt.replace(".", ",")
-
-                return txt
-
-        return str(value)
-
-    except:
-        return str(value)
-
-
+# --------------------------------------------------
+# LOAD EXCEL
+# --------------------------------------------------
 @st.cache_resource
-def load_workbook_cached():
-    return load_workbook(
-        FILE_XLSX,
-        data_only=False
-    )
+def load_excel():
+    return load_workbook(FILE)
 
+wb = load_excel()
 
-wb = load_workbook_cached()
+# --------------------------------------------------
+# SHEETS
+# --------------------------------------------------
+sheet_names = wb.sheetnames
 
-sheet_name = st.sidebar.selectbox(
+selected_sheet = st.sidebar.selectbox(
     "Seleziona Foglio",
-    wb.sheetnames
+    sheet_names
 )
 
-ws = wb[sheet_name]
+ws = wb[selected_sheet]
 
-rows = []
+# --------------------------------------------------
+# EXCEL --> DATAFRAME
+# --------------------------------------------------
+data = []
 
-max_col = ws.max_column
-
-for row in ws.iter_rows():
-
-    values = []
+for row in ws.iter_rows(values_only=True):
+    r = []
 
     for cell in row:
-        values.append(format_excel_value(cell))
+        if cell is None:
+            r.append("")
+        else:
+            r.append(str(cell))
 
-    while len(values) < max_col:
-        values.append("")
+    data.append(r)
 
-    rows.append(values)
-
-if len(rows) == 0:
+if len(data) == 0:
     df = pd.DataFrame()
 else:
-    df = pd.DataFrame(rows)
+    df = pd.DataFrame(data)
 
+# --------------------------------------------------
+# FORCE TEXT (NO CHECKBOX)
+# --------------------------------------------------
 column_config = {
     col: st.column_config.TextColumn(
-        str(col),
-        width="medium"
+        str(col)
     )
     for col in df.columns
 }
-
-st.subheader(sheet_name)
 
 edited_df = st.data_editor(
     df,
     use_container_width=True,
     num_rows="dynamic",
-    column_config=column_config,
-    key=f"editor_{sheet_name}"
+    column_config=column_config
 )
 
-if st.button("💾 Salva Workbook", type="primary"):
+# --------------------------------------------------
+# SAVE
+# --------------------------------------------------
+if st.button("💾 Salva"):
 
-    wb_save = load_workbook(
-        FILE_XLSX,
-        data_only=False
-    )
+    wb_save = load_workbook(FILE)
 
-    ws_save = wb_save[sheet_name]
+    ws_save = wb_save[selected_sheet]
 
     for r in range(len(edited_df)):
-
         for c in range(len(edited_df.columns)):
 
             value = edited_df.iat[r, c]
@@ -150,10 +92,124 @@ if st.button("💾 Salva Workbook", type="primary"):
                 column=c + 1
             ).value = value
 
-    wb_save.save(FILE_XLSX)
+    wb_save.save(FILE)
 
-    st.success("✅ Modifiche salvate correttamente.")
+    st.success("Salvataggio completato")
 
-    st.cache_resource.clear()
+# --------------------------------------------------
+# DOMINUS SCORE
+# --------------------------------------------------
+def calcola_ambito(nome_foglio):
 
-    st.rerun()
+    ws = wb[nome_foglio]
+
+    cg_tot = 0
+    cg_no = 0
+
+    si = 0
+    no = 0
+
+    for row in ws.iter_rows(min_row=2):
+
+        risposta = str(row[2].value).strip().upper()
+
+        try:
+            cg = float(row[3].value)
+        except:
+            cg = 0
+
+        cg_tot += cg
+
+        if risposta == "SI":
+            si += 1
+
+        elif risposta == "NO":
+            no += 1
+            cg_no += cg
+
+    vulnerabilita = 0
+
+    if cg_tot > 0:
+        vulnerabilita = cg_no / cg_tot
+
+    totale = si + no
+
+    score = 0
+
+    if totale > 0:
+        score = si / totale
+
+    return {
+        "si": si,
+        "no": no,
+        "vulnerabilita": vulnerabilita,
+        "score": score
+    }
+
+# --------------------------------------------------
+# SCORE LIVE
+# --------------------------------------------------
+try:
+
+    assetto = calcola_ambito("ASSETTO")
+    patrimonio = calcola_ambito("PATRIMONIO")
+    valore = calcola_ambito("VALORE")
+    custodia = calcola_ambito("CUSTODIA")
+
+    score_finale = (
+        assetto["vulnerabilita"] * 50 +
+        patrimonio["vulnerabilita"] * 10 +
+        valore["vulnerabilita"] * 30 +
+        custodia["vulnerabilita"] * 10
+    ) * 100
+
+    st.divider()
+
+    st.subheader("📈 DOMINUS SCORE LIVE")
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+
+    c1.metric(
+        "Assetto",
+        f"{assetto['vulnerabilita']*100:.2f}%"
+    )
+
+    c2.metric(
+        "Patrimonio",
+        f"{patrimonio['vulnerabilita']*100:.2f}%"
+    )
+
+    c3.metric(
+        "Valore",
+        f"{valore['vulnerabilita']*100:.2f}%"
+    )
+
+    c4.metric(
+        "Custodia",
+        f"{custodia['vulnerabilita']*100:.2f}%"
+    )
+
+    c5.metric(
+        "Dominus Score",
+        f"{score_finale:.2f}"
+    )
+
+    if score_finale < 35:
+        rating = "AAA"
+    elif score_finale < 43:
+        rating = "AA"
+    elif score_finale < 50:
+        rating = "A"
+    elif score_finale < 58:
+        rating = "BBB"
+    elif score_finale < 65:
+        rating = "BB"
+    elif score_finale < 80:
+        rating = "B"
+    else:
+        rating = "D"
+
+    st.success(f"🏆 Rating: {rating}")
+
+except Exception:
+    pass
