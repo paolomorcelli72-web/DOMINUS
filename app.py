@@ -243,30 +243,3 @@ if st.button("💾 Salva Workbook"):
         st.error(
             f"Errore salvataggio: {e}"
         )
-
-            for r in range(max_r):
-
-    for c in range(max_c):
-
-        try:
-
-            cella = ws.cell(
-                row=r + 1,
-                column=c + 1
-            )
-
-            if type(cella).__name__ == "MergedCell":
-                continue
-
-            valore = dataframe.iat[r, c]
-
-            if pd.isna(valore):
-                valore = None
-
-            try:
-                cella.value = valore
-            except:
-                pass
-
-        except:
-            pass
