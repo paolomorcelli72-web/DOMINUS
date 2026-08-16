@@ -1,47 +1,47 @@
 import pandas as pd
 import streamlit as st
+import openpyxl
 
-st.set_page_config(
-    page_title="DOMINUS - Editor Speciale INPUT",
-    page_icon="📊",
-    layout="wide",
-)
-st.title("📊 DOMINUS - Modifica Totale (Focus Sezione INPUT)")
-st.markdown("---")
+st.set_page_config(page_title="DOMINUS - Editor Totale", layout="wide")
+st.title("📊 DOMINUS - Editor Formato Identico all'Originale")
 
 file_path = "DOMINUS 2026 DEFINITIVO.xlsx"
 
 @st.cache_data
-def load_data():
-    return pd.read_excel(file_path, sheet_name=None, header=None)
+def load_data_exact():
+    wb = openpyxl.load_workbook(file_path, data_only=True)
+    sheets_dict = {}
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        data = ws.values
+        df = pd.DataFrame(data)
+        # Forza tutto a stringa per evitare che Streamlit faccia "magie" con checkbox o numeri
+        df = df.astype(str).replace("nan", "")
+        sheets_dict[sheet_name] = df
+    return sheets_dict
 
 if "master_data" not in st.session_state:
-    st.session_state["master_data"] = load_data()
+    st.session_state["master_data"] = load_data_exact()
 
-# Selezione Sezione
-sheet_names = list(st.session_state["master_data"].keys())
-selected_sheet = st.sidebar.selectbox("Seleziona Sezione", sheet_names, index=sheet_names.index("INPUT"))
+sheet_list = list(st.session_state["master_data"].keys())
+selected_sheet = st.sidebar.selectbox("Seleziona Sezione", sheet_list)
 
-st.subheader(f"Area Attiva: {selected_sheet}")
+st.subheader(f"Sezione: {selected_sheet}")
 
-# Editor Speciale che preserva i formati
+# Configurazione colonna per colonna: forziamo il tipo "text" per non avere checkbox
 df_corrente = st.session_state["master_data"][selected_sheet]
+column_config = {col: st.column_config.TextColumn(str(col)) for col in df_corrente.columns}
 
-# Sezione specifica per il foglio INPUT: vogliamo che ogni cella sia editabile
-# Utilizziamo un editor che non forzi la conversione in stringa, mantenendo intatte le %
-df_modificato = st.data_editor(
+# Editor Blindato
+edited_df = st.data_editor(
     df_corrente,
     use_container_width=True,
     num_rows="dynamic",
-    key=f"editor_{selected_sheet}"
+    column_config=column_config,
+    key=f"editor_blindato_{selected_sheet}"
 )
 
-# Salvataggio
-if st.button("💾 Salva Modifiche per questa Sezione"):
-    st.session_state["master_data"][selected_sheet] = df_modificato
-    st.success(f"Modifiche salvate con successo nel foglio {selected_sheet}!")
+st.session_state["master_data"][selected_sheet] = edited_df
 
-# Mostriamo i dati correnti per controllo
-st.markdown("---")
-st.write("Visualizzazione Dati Correnti:")
-st.dataframe(st.session_state["master_data"][selected_sheet], use_container_width=True)
+if st.button("💾 Salva"):
+    st.success("Modifiche salvate!")
