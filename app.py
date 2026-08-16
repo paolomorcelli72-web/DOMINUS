@@ -1,43 +1,27 @@
-import pandas as pd
 import streamlit as st
 
-st.set_page_config(
-    page_title="DOMINUS - Cabina di Regia", page_icon="📊", layout="wide"
-)
-st.title("📊 DOMINUS - Cabina di Regia Imprenditoriale")
-st.markdown("---")
+st.set_page_config(page_title="DOMINUS - Intervista", layout="centered")
 
-file_path = "DOMINUS 2026 DEFINITIVO.xlsx"
+st.title("📊 Intervista DOMINUS")
+st.markdown("Risponda alle seguenti domande per calcolare il Suo Score.")
 
+# Creiamo una sessione per salvare le risposte
+if 'risposte' not in st.session_state:
+    st.session_state.risposte = {}
 
-@st.cache_data
-def load_data(path):
-  xls = pd.ExcelFile(path)
-  sheet_names = xls.sheet_names
-  # Leggiamo i fogli impostando la prima riga come intestazione vera
-  sheets_data = {}
-  for sheet in sheet_names:
-    df = pd.read_excel(path, sheet_name=sheet)
-    # Correggiamo l'intestazione prendendo la prima riga se necessario
-    if sheet == "INPUT":
-      df = pd.read_excel(path, sheet_name=sheet, header=1)
-    sheets_data[sheet] = df
-  return sheet_names, sheets_data
+# Esempio di Intervista (può aggiungere tutte le domande che vuole)
+tab1, tab2 = st.tabs(["Fase 1: Dati Aziendali", "Fase 2: Analisi Rischi"])
 
+with tab1:
+    st.session_state.risposte['fatturato'] = st.number_input("Inserisca il fatturato previsto:", min_value=0)
+    st.session_state.risposte['dipendenti'] = st.slider("Numero di dipendenti:", 0, 500, 10)
 
-try:
-  sheet_names, sheets_data = load_data(file_path)
-  sheet = st.sidebar.selectbox("Seleziona Area", sheet_names)
+with tab2:
+    st.session_state.risposte['rischio_mercato'] = st.radio("Come valuta il rischio mercato?", ["Basso", "Medio", "Alto"])
 
-  st.subheader(f"Area: {sheet}")
-  df_display = sheets_data[sheet]
-
-  # Formattazione intelligente per la tabella INPUT (moltiplicazione per 100 per visualizzarli come % ove opportuno)
-  if sheet == "INPUT":
-    # Se la colonna 'Valore' esiste, formattiamo o gestiamo la visualizzazione
-    st.dataframe(df_display, use_container_width=True)
-  else:
-    st.dataframe(df_display, use_container_width=True)
-
-except Exception as e:
-  st.error(f"Errore: {e}")
+# Bottone di calcolo finale
+if st.button("CALCOLA DOMINUS SCORE"):
+    # Qui inseriremo la logica di calcolo basata sul Suo file Excel
+    st.success("Analisi completata!")
+    st.write("Le Sue risposte:", st.session_state.risposte)
+    st.metric(label="DOMINUS SCORE FINALE", value="78/100")
