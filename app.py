@@ -13,10 +13,14 @@ def load_data_exact():
     sheets_dict = {}
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
-        data = ws.values
-        df = pd.DataFrame(data)
-        # Forza tutto a stringa per evitare che Streamlit faccia "magie" con checkbox o numeri
-        df = df.astype(str).replace("nan", "")
+        data = list(ws.values)
+        if data:
+            df = pd.DataFrame(data)
+            # Sostituiamo i valori None con stringhe vuote per una visualizzazione pulita,
+            # ma senza distruggere i tipi nativi (percentuali e numeri originali dell'Excel)
+            df = df.fillna("")
+        else:
+            df = pd.DataFrame()
         sheets_dict[sheet_name] = df
     return sheets_dict
 
@@ -28,7 +32,8 @@ selected_sheet = st.sidebar.selectbox("Seleziona Sezione", sheet_list)
 
 st.subheader(f"Sezione: {selected_sheet}")
 
-# Configurazione colonna per colonna: forziamo il tipo "text" per non avere checkbox
+# Configurazione colonna per colonna: impedisce che i testi "SI/NO" diventino checkbox, 
+# lasciando intatte le percentuali e i numeri originali.
 df_corrente = st.session_state["master_data"][selected_sheet]
 column_config = {col: st.column_config.TextColumn(str(col)) for col in df_corrente.columns}
 
@@ -44,4 +49,4 @@ edited_df = st.data_editor(
 st.session_state["master_data"][selected_sheet] = edited_df
 
 if st.button("💾 Salva"):
-    st.success("Modifiche salvate!")
+    st.success("Modifiche salvate con successo!")
