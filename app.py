@@ -29,12 +29,11 @@ st.subheader(f"Area Attiva: {selected_sheet}")
 df_to_show = sheets_data[selected_sheet].copy()
 
 
-# Funzione di formattazione sicura che protegge i codici (Partita IVA, ATECO, ecc.)
-def format_numbers_safely(val, col_name="", sheet_name="", row_label=""):
+# Funzione per mostrare solo numeri interi con separatore delle migliaia
+def format_integers_only(val, col_name="", sheet_name="", row_label=""):
   if pd.isnull(val) or val == "None":
     return val
 
-  # Se siamo nella sezione Anagrafica e la riga riguarda Partita IVA o Codice ATECO, non tocchiamo nulla
   str_label = str(row_label).upper()
   if "ANAGRAFICA" in sheet_name.upper() and (
       "IVA" in str_label
@@ -42,14 +41,11 @@ def format_numbers_safely(val, col_name="", sheet_name="", row_label=""):
       or "CODICE" in str_label
       or "P.IVA" in str_label
   ):
-    return str(val).replace(
-        ".0", ""
-    )  # Rimuove eventuali .0 superflui se letti come numeri
+    return str(val).replace(".0", "")
 
   try:
     num_val = float(val)
 
-    # Controlliamo se è una percentuale
     is_percentage = False
     if any(
         p in str(col_name).upper() for p in ["%", "ROS", "MARGIN", "TASSO", "PESO"]
@@ -60,34 +56,25 @@ def format_numbers_safely(val, col_name="", sheet_name="", row_label=""):
 
     if is_percentage:
       val_pct = num_val * 100 if num_val < 1 else num_val
-      return (
-          f"{val_pct:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-          + "%"
-      )
+      # Percentuale intera o con 1 decimale se serve, qui arrotondata a intero con %
+      return f"{round(val_pct):,}".replace(",", ".") + "%"
     else:
-      # Evitiamo di formattare come numeri con decimali i codici lunghi o interi che non lo richiedono
       if num_val > 1000000000 and not any(
           k in str(col_name).upper() for k in ["VALORE", "IMPORTO", "FATTURATO"]
       ):
         return str(val).replace(".0", "")
-      return (
-          f"{num_val:,.2f}"
-          .replace(",", "X")
-          .replace(".", ",")
-          .replace("X", ".")
-      )
+      # Mostra solo numeri interi con il punto per le migliaia (senza decimali)
+      return f"{round(num_val):,}".replace(",", ".")
 
   except (ValueError, TypeError):
     return val
 
 
-# Troviamo la colonna delle etichette (di solito la prima colonna a sinistra)
 label_col = df_to_show.columns[0] if len(df_to_show.columns) > 0 else None
 
-# Applichiamo la formattazione cella per cella escludendo i dati anagrafici sensibili
 for col in df_to_show.columns:
   df_to_show[col] = [
-      format_numbers_safely(
+      format_integers_only(
           df_to_show.loc[i, col],
           col_name=col,
           sheet_name=selected_sheet,
